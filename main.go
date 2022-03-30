@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cmd, err := readCommand()
+	input, err := readCommand()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,10 +31,15 @@ func main() {
 	// New message event
 	lp.MessageNew(func(_ context.Context, obj events.MessageNewObject) {
 		if obj.Message.Text == "/shutdown" {
-			log.Printf("/shutdown received")
+			name, err := getName(obj.Message.FromID, vk)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-			kill := exec.Command(cmd[0], cmd[1:]...)
-			if out, err := kill.CombinedOutput(); err != nil {
+			log.Printf("/shutdown triggered by %v\n", name)
+
+			cmd := exec.Command(input[0], input[1:]...)
+			if out, err := cmd.CombinedOutput(); err != nil {
 				log.Fatalf("err: %s\noutput: %s", err.Error(), string(out))
 			}
 
@@ -47,6 +52,17 @@ func main() {
 	if err := lp.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getName(id int, vk *api.VK) ([]string, error) {
+	sender, err := vk.UsersGet(api.Params{
+		"user_ids": id,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Error getting user by id\nerr: %v", err)
+	}
+
+	return []string{sender[0].FirstName, sender[0].LastName}, nil
 }
 
 func readCommand() ([]string, error) {
@@ -64,7 +80,7 @@ func readCommand() ([]string, error) {
 
 	cmd := strings.Fields(inputCmd)
 
-	if len(cmd) <= 1 {
+	if len(cmd) < 2 {
 		return nil, fmt.Errorf("No arguments for command")
 	}
 
